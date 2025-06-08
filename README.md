@@ -34,8 +34,8 @@ Digital Pin Finder is a web application that allows users to discover and visual
 
 1. **Clone the Repository** (if hosted on a version control platform):
    ```bash
-   git clone https://github.com/your-username/digital-pin-finder.git
-   cd digital-pin-finder
+   git clone https://github.com/niraj-ghetiya/Digipin.git
+   cd Digipin
    ```
 
 2. **Serve the Application**:
@@ -49,14 +49,6 @@ Digital Pin Finder is a web application that allows users to discover and visual
    - Open your browser and navigate to `http://localhost:8000` (or the port you specified).
    - Allow geolocation permissions when prompted for location access.
 
-### Project Structure
-
-```
-digital-pin-finder/
-├── index.html       # Main HTML file with embedded CSS and JavaScript
-├── README.md        # Project documentation (this file)
-└── CHANGELOG.md     # Record of changes and updates
-```
 
 ## Usage
 
@@ -115,13 +107,6 @@ Contributions are welcome! To contribute:
 
 Please follow the existing code style and include tests for new features.
 
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a detailed history of changes.
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
