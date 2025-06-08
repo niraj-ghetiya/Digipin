@@ -519,20 +519,7 @@
 
         <!-- Information Panel -->
         <div class="info-panel">
-            <h2>Location Information</h2>
             <div id="locationInfo" class="location-info">
-                <div class="info-card">
-                    <h3>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                        Instructions
-                    </h3>
-                    <p>Click the "Get My Location" button to find your current position and discover nearby digital pins. The map will show your location and interesting points around you.</p>
-                    <p>Once pins are found, you can generate a QR code to share any location or open it directly in Google Maps.</p>
-                </div>
             </div>
 
             <!-- Action Buttons (initially hidden) -->
@@ -589,6 +576,112 @@
             crossorigin=""></script>
 
     <script>
+        // DIGIPIN
+        const DIGIPIN_GRID = [
+            ['F', 'C', '9', '8'],
+            ['J', '3', '2', '7'],
+            ['K', '4', '5', '6'],
+            ['L', 'M', 'P', 'T']
+        ];
+        
+        const BOUNDS = {
+            minLat: 2.5,
+            maxLat: 38.5,
+            minLon: 63.5,
+            maxLon: 99.5
+        };
+        
+        function getDigiPin(lat, lon) {
+            if (lat < BOUNDS.minLat || lat > BOUNDS.maxLat) throw new Error('Latitude out of range');
+            if (lon < BOUNDS.minLon || lon > BOUNDS.maxLon) throw new Error('Longitude out of range');
+        
+            let minLat = BOUNDS.minLat;
+            let maxLat = BOUNDS.maxLat;
+            let minLon = BOUNDS.minLon;
+            let maxLon = BOUNDS.maxLon;
+        
+            let digiPin = '';
+        
+            for (let level = 1; level <= 10; level++) {
+            const latDiv = (maxLat - minLat) / 4;
+            const lonDiv = (maxLon - minLon) / 4;
+        
+            // REVERSED row logic (to match original)
+            let row = 3 - Math.floor((lat - minLat) / latDiv);
+            let col = Math.floor((lon - minLon) / lonDiv);
+        
+            row = Math.max(0, Math.min(row, 3));
+            col = Math.max(0, Math.min(col, 3));
+        
+            digiPin += DIGIPIN_GRID[row][col];
+        
+            if (level === 3 || level === 6) digiPin += '-';
+        
+            // Update bounds (reverse logic for row)
+            maxLat = minLat + latDiv * (4 - row);
+            minLat = minLat + latDiv * (3 - row);
+        
+            minLon = minLon + lonDiv * col;
+            maxLon = minLon + lonDiv;
+            }
+        
+            return digiPin;
+        }
+        
+        
+        function getLatLngFromDigiPin(digiPin) {
+            const pin = digiPin.replace(/-/g, '');
+            if (pin.length !== 10) throw new Error('Invalid DIGIPIN');
+            
+            let minLat = BOUNDS.minLat;
+            let maxLat = BOUNDS.maxLat;
+            let minLon = BOUNDS.minLon;
+            let maxLon = BOUNDS.maxLon;
+        
+            for (let i = 0; i < 10; i++) {
+            const char = pin[i];
+            let found = false;
+            let ri = -1, ci = -1;
+        
+            // Locate character in DIGIPIN grid
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                if (DIGIPIN_GRID[r][c] === char) {
+                    ri = r;
+                    ci = c;
+                    found = true;
+                    break;
+                }
+                }
+                if (found) break;
+            }
+        
+            if (!found) throw new Error('Invalid character in DIGIPIN');
+        
+            const latDiv = (maxLat - minLat) / 4;
+            const lonDiv = (maxLon - minLon) / 4;
+        
+            const lat1 = maxLat - latDiv * (ri + 1);
+            const lat2 = maxLat - latDiv * ri;
+            const lon1 = minLon + lonDiv * ci;
+            const lon2 = minLon + lonDiv * (ci + 1);
+        
+            // Update bounding box for next level
+            minLat = lat1;
+            maxLat = lat2;
+            minLon = lon1;
+            maxLon = lon2;
+            }
+        
+            const centerLat = (minLat + maxLat) / 2;
+            const centerLon = (minLon + maxLon) / 2;
+        
+            return {
+            latitude: centerLat.toFixed(6),
+            longitude: centerLon.toFixed(6)
+            };
+        }
+
         // Global variables
         let map = null;
         let userMarker = null;
@@ -673,28 +766,18 @@
                 userLocation = {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude,
-                    accuracy: position.coords.accuracy
+                    accuracy: position.coords.accuracy,
+                    digipin : getDigiPin(position.coords.latitude,position.coords.longitude)
                 };
 
                 // Update map with user location
                 updateMapWithUserLocation(userLocation);
 
-                // Fetch nearby digital pins
-                const pins = await fetchNearbyDigitalPins(userLocation);
-                
-                // Display digital pins on map
-                displayDigitalPins(pins);
-
-                // Update information panel
-                updateLocationInfo(userLocation, pins);
-
                 // Show action buttons
                 actionButtons.style.display = 'flex';
 
-                // Set the first pin as selected by default
-                selectedPin = pins[0];
 
-                showStatus(`Location found! Discovered ${pins.length} nearby digital pins.`, 'success');
+                showStatus(`Location found! DIGIPIN ${userLocation.digipin}`, 'success');
 
             } catch (error) {
                 console.error('Error getting location:', error);
@@ -766,7 +849,7 @@
                         <b>📍 Your Location</b><br>
                         Lat: ${location.lat.toFixed(6)}<br>
                         Lng: ${location.lng.toFixed(6)}<br>
-                        Accuracy: ±${Math.round(location.accuracy)}m
+                        DIGIPIN: ${getDigiPin(location.lat,location.lng)}
                     </div>
                 `)
                 .openPopup();
@@ -784,126 +867,10 @@
             }).addTo(map);
         }
 
-        /**
-         * Fetch nearby digital pins using geocoding
-         * @param {Object} location - User's location
-         * @returns {Promise<Array>} Array of digital pins
-         */
-        async function fetchNearbyDigitalPins(location) {
-            // Simulate API delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Generate mock nearby points of interest
-            const mockPins = generateMockDigitalPins(location);
-
-            return mockPins;
-        }
-
-        /**
-         * Generate mock digital pins around user location
-         * @param {Object} userLoc - User's location
-         * @returns {Array} Array of mock digital pins
-         */
-        function generateMockDigitalPins(userLoc) {
-            const pins = [];
-            const categories = [
-                { name: 'Restaurant', icon: '🍽️', color: '#e74c3c' },
-                { name: 'Coffee Shop', icon: '☕', color: '#8b4513' },
-                { name: 'Park', icon: '🌳', color: '#27ae60' },
-                { name: 'Museum', icon: '🏛️', color: '#9b59b6' },
-                { name: 'Shopping', icon: '🛍️', color: '#f39c12' },
-                { name: 'Gas Station', icon: '⛽', color: '#34495e' },
-                { name: 'Hospital', icon: '🏥', color: '#e67e22' },
-                { name: 'School', icon: '🏫', color: '#3498db' }
-            ];
-
-            // Generate 8-12 random pins within ~2km radius
-            const numPins = Math.floor(Math.random() * 5) + 8;
-            
-            for (let i = 0; i < numPins; i++) {
-                const category = categories[Math.floor(Math.random() * categories.length)];
-                
-                // Generate random offset (roughly within 2km)
-                const latOffset = (Math.random() - 0.5) * 0.02;
-                const lngOffset = (Math.random() - 0.5) * 0.02;
-                
-                const pin = {
-                    id: i + 1,
-                    name: `${category.name} ${i + 1}`,
-                    category: category.name,
-                    icon: category.icon,
-                    color: category.color,
-                    lat: userLoc.lat + latOffset,
-                    lng: userLoc.lng + lngOffset,
-                    distance: Math.round(Math.random() * 1500 + 100), // 100m to 1.6km
-                    rating: (Math.random() * 2 + 3).toFixed(1), // 3.0 to 5.0
-                    description: `A great ${category.name.toLowerCase()} in your area.`
-                };
-
-                pins.push(pin);
-            }
-
-            // Sort by distance
-            pins.sort((a, b) => a.distance - b.distance);
-
-            return pins;
-        }
-
-        /**
-         * Display digital pins on the map
-         * @param {Array} pins - Array of digital pins
-         */
-        function displayDigitalPins(pins) {
-            // Clear existing digital pins
-            digitalPins.forEach(marker => map.removeLayer(marker));
-            digitalPins = [];
-
-            // Add new digital pins
-            pins.forEach(pin => {
-                // Create custom icon for each pin
-                const pinIcon = L.divIcon({
-                    className: 'digital-pin-marker',
-                    html: `<div style="
-                        background: ${pin.color}; 
-                        width: 30px; 
-                        height: 30px; 
-                        border-radius: 50%; 
-                        border: 2px solid white; 
-                        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 14px;
-                    ">${pin.icon}</div>`,
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15]
-                });
-
-                // Create marker
-                const marker = L.marker([pin.lat, pin.lng], { icon: pinIcon })
-                    .addTo(map)
-                    .bindPopup(`
-                        <div style="min-width: 200px; color: #333;">
-                            <h3 style="margin: 0 0 10px 0; color: ${pin.color};">
-                                ${pin.icon} ${pin.name}
-                            </h3>
-                            <p style="margin: 5px 0;"><strong>Category:</strong> ${pin.category}</p>
-                            <p style="margin: 5px 0;"><strong>Distance:</strong> ${pin.distance}m away</p>
-                            <p style="margin: 5px 0;"><strong>Rating:</strong> ${pin.rating} stars</p>
-                            <p style="margin: 5px 0;">${pin.description}</p>
-                        </div>
-                    `);
-
-                // Store the marker in the digitalPins array
-                digitalPins.push(marker);
-
-                // Add click event listener to each marker
-                marker.on('click', () => {
-                    selectedPin = pin;
-                    updateActionButtons(pin);
-                });
-            });
-        }
+      
+        
+        
+        
 
         /**
          * Update the action buttons based on the selected pin
@@ -917,54 +884,6 @@
                 showQrBtn.disabled = true;
                 directMapsBtn.disabled = true;
             }
-        }
-
-        /**
-         * Update the location information panel
-         * @param {Object} location - User's location
-         * @param {Array} pins - Array of digital pins
-         */
-        function updateLocationInfo(location, pins) {
-            // Clear existing content
-            locationInfo.innerHTML = '';
-
-            // Create user location card
-            const userCard = document.createElement('div');
-            userCard.className = 'info-card';
-            userCard.innerHTML = `
-                <h3>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
-                    Your Location
-                </h3>
-                <p>
-                    <strong>Latitude:</strong> <span class="coordinates">${location.lat.toFixed(6)}</span><br>
-                    <strong>Longitude:</strong> <span class="coordinates">${location.lng.toFixed(6)}</span><br>
-                    <strong>Accuracy:</strong> ±${Math.round(location.accuracy)} meters
-                </p>
-            `;
-            locationInfo.appendChild(userCard);
-
-            // Create digital pin cards
-            pins.forEach(pin => {
-                const pinCard = document.createElement('div');
-                pinCard.className = 'info-card';
-                pinCard.innerHTML = `
-                    <h3>
-                        ${pin.icon} ${pin.name}
-                    </h3>
-                    <p>
-                        <strong>Category:</strong> ${pin.category}<br>
-                        <strong>Distance:</strong> ${pin.distance}m away<br>
-                        <strong>Rating:</strong> ${pin.rating} stars<br>
-                        ${pin.description}
-                    </p>
-                `;
-                locationInfo.appendChild(pinCard);
-            });
         }
 
         /**
@@ -1020,12 +939,12 @@
          * Generate QR code for the selected location
          */
         function showQRCode() {
-            if (!selectedPin) {
+            if (!userLocation) {
                 alert('Please select a location first.');
                 return;
             }
 
-            const locationURL = `https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`;
+            const locationURL = `https://www.google.com/maps/search/?api=1&query=${userLocation.lat},${userLocation.lng}`;
 
             // Clear previous QR code
             qrCode.innerHTML = '';
@@ -1048,12 +967,12 @@
          * Open selected location in Google Maps
          */
         function openInGoogleMaps() {
-            if (!selectedPin) {
+            if (!userLocation) {
                 alert('Please select a location first.');
                 return;
             }
 
-            const locationURL = `https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`;
+            const locationURL = `https://www.google.com/maps/search/?api=1&query=${userLocation.lat},${userLocation.lng}`;
             window.open(locationURL, '_blank');
         }
 
