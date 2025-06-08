@@ -889,3 +889,181 @@
                             </h3>
                             <p style="margin: 5px 0;"><strong>Category:</strong> ${pin.category}</p>
                             <p style="margin: 5px 0;"><strong>Distance:</strong> ${pin.distance}m away</p>
+                            <p style="margin: 5px 0;"><strong>Rating:</strong> ${pin.rating} stars</p>
+                            <p style="margin: 5px 0;">${pin.description}</p>
+                        </div>
+                    `);
+
+                // Store the marker in the digitalPins array
+                digitalPins.push(marker);
+
+                // Add click event listener to each marker
+                marker.on('click', () => {
+                    selectedPin = pin;
+                    updateActionButtons(pin);
+                });
+            });
+        }
+
+        /**
+         * Update the action buttons based on the selected pin
+         * @param {Object} pin - The selected digital pin
+         */
+        function updateActionButtons(pin) {
+            if (pin) {
+                showQrBtn.disabled = false;
+                directMapsBtn.disabled = false;
+            } else {
+                showQrBtn.disabled = true;
+                directMapsBtn.disabled = true;
+            }
+        }
+
+        /**
+         * Update the location information panel
+         * @param {Object} location - User's location
+         * @param {Array} pins - Array of digital pins
+         */
+        function updateLocationInfo(location, pins) {
+            // Clear existing content
+            locationInfo.innerHTML = '';
+
+            // Create user location card
+            const userCard = document.createElement('div');
+            userCard.className = 'info-card';
+            userCard.innerHTML = `
+                <h3>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    Your Location
+                </h3>
+                <p>
+                    <strong>Latitude:</strong> <span class="coordinates">${location.lat.toFixed(6)}</span><br>
+                    <strong>Longitude:</strong> <span class="coordinates">${location.lng.toFixed(6)}</span><br>
+                    <strong>Accuracy:</strong> ±${Math.round(location.accuracy)} meters
+                </p>
+            `;
+            locationInfo.appendChild(userCard);
+
+            // Create digital pin cards
+            pins.forEach(pin => {
+                const pinCard = document.createElement('div');
+                pinCard.className = 'info-card';
+                pinCard.innerHTML = `
+                    <h3>
+                        ${pin.icon} ${pin.name}
+                    </h3>
+                    <p>
+                        <strong>Category:</strong> ${pin.category}<br>
+                        <strong>Distance:</strong> ${pin.distance}m away<br>
+                        <strong>Rating:</strong> ${pin.rating} stars<br>
+                        ${pin.description}
+                    </p>
+                `;
+                locationInfo.appendChild(pinCard);
+            });
+        }
+
+        /**
+         * Handle location error
+         * @param {Object} error - Error object
+         */
+        function handleLocationError(error) {
+            let message;
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    message = "User denied the request for Geolocation.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = "Location information is unavailable.";
+                    break;
+                case error.TIMEOUT:
+                    message = "The request to get user location timed out.";
+                    break;
+                case error.UNKNOWN_ERROR:
+                    message = "An unknown error occurred.";
+                    break;
+            }
+            showStatus(message, 'error');
+        }
+
+        /**
+         * Show status message
+         * @param {string} message - Status message
+         * @param {string} type - Status type ('success' or 'error')
+         */
+        function showStatus(message, type = 'success') {
+            status.textContent = message;
+            status.className = `status show ${type}`;
+        }
+
+        /**
+         * Hide status message
+         */
+        function hideStatus() {
+            status.classList.remove('show', 'success', 'error');
+        }
+
+        /**
+         * Set loading state
+         * @param {boolean} isLoading - Whether to show loading state
+         */
+        function setLoadingState(isLoading) {
+            getLocationBtn.disabled = isLoading;
+            loading.classList.toggle('show', isLoading);
+        }
+
+        /**
+         * Generate QR code for the selected location
+         */
+        function showQRCode() {
+            if (!selectedPin) {
+                alert('Please select a location first.');
+                return;
+            }
+
+            const locationURL = `https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`;
+
+            // Clear previous QR code
+            qrCode.innerHTML = '';
+
+            // Generate QR code using qrcode.js
+            const qrcode = new QRCode(qrCode, {
+                text: locationURL,
+                width: 200,
+                height: 200,
+                colorDark : "#000",
+                colorLight : "#fff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+
+            // Show the modal
+            qrModal.classList.add('show');
+        }
+
+        /**
+         * Open selected location in Google Maps
+         */
+        function openInGoogleMaps() {
+            if (!selectedPin) {
+                alert('Please select a location first.');
+                return;
+            }
+
+            const locationURL = `https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`;
+            window.open(locationURL, '_blank');
+        }
+
+        /**
+         * Close QR code modal
+         */
+        function closeQRModal() {
+            qrModal.classList.remove('show');
+        }
+    </script>
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+</body>
+</html>
